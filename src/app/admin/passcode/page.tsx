@@ -16,7 +16,7 @@ export default async function AdminPasscodePage({ searchParams }: { searchParams
       </div>
       <Card>
         <CardContent>
-          <PasscodeForm next={next && next.startsWith("/") ? next : "/"} />
+          <PasscodeForm next={next && next.startsWith("/") ? next : "/admin"} />
         </CardContent>
       </Card>
     </div>

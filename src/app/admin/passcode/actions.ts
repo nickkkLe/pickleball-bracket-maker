@@ -6,7 +6,7 @@ import { ADMIN_AUTH_COOKIE, checkAdminPasscode, expectedAdminCookieValue } from 
 
 export async function submitAdminPasscode(formData: FormData) {
   const passcode = String(formData.get("passcode") || "");
-  const next = String(formData.get("next") || "/");
+  const next = String(formData.get("next") || "/admin");
 
   if (!checkAdminPasscode(passcode)) {
     throw new Error("Incorrect passcode");
