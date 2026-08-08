@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useTransition } from "react";
-import { Shuffle, ArrowUpDown, X } from "lucide-react";
+import { toast } from "sonner";
+import { Shuffle, ArrowUpDown, X, Copy } from "lucide-react";
 import type { Player } from "@/generated/prisma/client";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,6 +35,7 @@ function PlayerRow({
   removePlayer,
   adminToggleCheckIn,
   showCheckIn,
+  tournamentSlug,
 }: {
   player: Player;
   canEdit: boolean;
@@ -41,6 +43,7 @@ function PlayerRow({
   removePlayer: FormAction;
   adminToggleCheckIn: FormAction;
   showCheckIn: boolean;
+  tournamentSlug: string;
 }) {
   const { run } = useSubmit();
 
@@ -48,6 +51,7 @@ function PlayerRow({
     <TableRow>
       <TableCell className="py-1.5">
         <Input
+          key={player.seed}
           type="number"
           defaultValue={player.seed}
           disabled={!canEdit}
@@ -63,7 +67,21 @@ function PlayerRow({
       </TableCell>
       <TableCell className="py-1.5 font-medium">{player.name}</TableCell>
       <TableCell className="py-1.5 text-center text-xs text-muted-foreground">{player.rating ?? "—"}</TableCell>
-      <TableCell className="py-1.5 text-center font-mono text-xs">{player.code}</TableCell>
+      <TableCell className="py-1.5 text-center">
+        <button
+          type="button"
+          onClick={async () => {
+            const url = `${window.location.origin}/t/${tournamentSlug}/p/${player.code}`;
+            await navigator.clipboard.writeText(url);
+            toast.success(`Copied ${player.name}'s check-in link`);
+          }}
+          className="inline-flex items-center gap-1 font-mono text-xs text-foreground hover:underline"
+          title={`Copy ${player.name}'s check-in link, in case they lost it`}
+        >
+          {player.code}
+          <Copy className="size-3 text-muted-foreground" />
+        </button>
+      </TableCell>
       {showCheckIn && (
         <TableCell className="py-1.5 text-center">
           <Badge
@@ -74,6 +92,7 @@ function PlayerRow({
               fd.set("playerId", player.id);
               run(adminToggleCheckIn, fd);
             }}
+            title={player.checkedIn && player.checkedInAt ? `Checked in ${new Date(player.checkedInAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Click to check in manually"}
           >
             {player.checkedIn ? "Checked in" : "Not yet"}
           </Badge>
@@ -103,6 +122,7 @@ function PlayerRow({
 export function PlayerManager({
   players,
   status,
+  tournamentSlug,
   addPlayer,
   addPlayersFromCsv,
   removePlayer,
@@ -113,6 +133,7 @@ export function PlayerManager({
 }: {
   players: Player[];
   status: string;
+  tournamentSlug: string;
   addPlayer: FormAction;
   addPlayersFromCsv: FormAction;
   removePlayer: FormAction;
@@ -209,6 +230,7 @@ export function PlayerManager({
                   removePlayer={removePlayer}
                   adminToggleCheckIn={adminToggleCheckIn}
                   showCheckIn={showCheckIn}
+                  tournamentSlug={tournamentSlug}
                 />
               ))}
             </TableBody>

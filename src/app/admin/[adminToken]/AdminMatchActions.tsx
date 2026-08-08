@@ -23,7 +23,7 @@ export function AdminMatchActions({
       {canScore && <ScoreForm matchId={match.id} player1Name={match.player1!.name} player2Name={match.player2!.name} action={recordScore} />}
       <form action={(fd) => startTransition(() => setCourt(fd))} className="flex items-center gap-1.5">
         <input type="hidden" name="matchId" value={match.id} />
-        <Input name="court" defaultValue={match.court ?? ""} placeholder="Court" className="h-7 min-w-0 flex-1 text-xs" />
+        <Input key={match.court ?? ""} name="court" defaultValue={match.court ?? ""} placeholder="Court" className="h-7 min-w-0 flex-1 text-xs" />
         <Button type="submit" variant="outline" size="sm" disabled={pending} className="h-7 text-[11px]">
           Set
         </Button>

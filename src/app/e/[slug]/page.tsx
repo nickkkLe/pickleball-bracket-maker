@@ -1,9 +1,10 @@
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { loadEventBySlug } from "@/lib/eventData";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { NotAvailable } from "@/components/NotAvailable";
 
 const STATUS_META: Record<string, { label: string; variant: "outline" | "secondary" | "default" }> = {
   DRAFT: { label: "Not started", variant: "outline" },
@@ -22,7 +23,9 @@ const FORMAT_LABEL: Record<string, string> = {
 export default async function EventPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const data = await loadEventBySlug(slug);
-  if (!data) notFound();
+  if (!data) {
+    return <NotAvailable title="This event isn't available" description="It may have been deleted, or the link is incorrect." />;
+  }
 
   if (data.divisions.length === 1) {
     redirect(`/t/${data.divisions[0].slug}`);

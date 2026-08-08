@@ -1,4 +1,3 @@
-import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowUpRight, Settings2 } from "lucide-react";
 import { loadEventByAdminToken } from "@/lib/eventData";
@@ -7,6 +6,7 @@ import { QrCode } from "@/components/QrCode";
 import { CreateTournamentForm } from "@/components/CreateTournamentForm";
 import { RecordAdminVisit } from "@/components/RecordAdminVisit";
 import { DeleteDivisionButton } from "@/components/DeleteDivisionButton";
+import { NotAvailable } from "@/components/NotAvailable";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { createDivision } from "./actions";
@@ -29,7 +29,9 @@ const FORMAT_LABEL: Record<string, string> = {
 export default async function EventAdminPage({ params }: { params: Promise<{ eventAdminToken: string }> }) {
   const { eventAdminToken } = await params;
   const data = await loadEventByAdminToken(eventAdminToken);
-  if (!data) notFound();
+  if (!data) {
+    return <NotAvailable title="This event isn't available" description="It may have been deleted, or the link is incorrect." />;
+  }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
   const publicUrl = `${siteUrl}/e/${data.event.slug}`;

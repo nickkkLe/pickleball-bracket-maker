@@ -1,4 +1,3 @@
-import { notFound } from "next/navigation";
 import Link from "next/link";
 import { KeyRound, ArrowLeft } from "lucide-react";
 import { loadTournamentBySlug, matchesToView } from "@/lib/tournamentData";
@@ -8,6 +7,7 @@ import { PoolMatchList } from "@/components/PoolMatchList";
 import { LiveRefresher } from "@/components/LiveRefresher";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { NotAvailable } from "@/components/NotAvailable";
 import { CodeEntryForm } from "./CodeEntryForm";
 import { goToPlayerPage } from "./actions";
 
@@ -28,7 +28,9 @@ const FORMAT_LABEL: Record<string, string> = {
 export default async function PublicTournamentPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const data = await loadTournamentBySlug(slug);
-  if (!data) notFound();
+  if (!data) {
+    return <NotAvailable title="This tournament isn't available" description="It may have been deleted, or the link is incorrect." />;
+  }
 
   const { tournament, event, players, playerById, bracketMatches, poolStandings } = data;
   const sortedPlayers = [...players].sort((a, b) => a.seed - b.seed);

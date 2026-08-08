@@ -1,10 +1,10 @@
-import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { loadTournamentBySlug, matchesToView } from "@/lib/tournamentData";
 import { PoolStandings } from "@/components/PoolStandings";
 import { LiveRefresher } from "@/components/LiveRefresher";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { NotAvailable } from "@/components/NotAvailable";
 import { CheckInButton } from "./CheckInButton";
 import { PlayerScoreCard } from "./PlayerScoreCard";
 import { playerCheckIn, playerRecordScore } from "../../actions";
@@ -13,11 +13,15 @@ export default async function PlayerPage({ params }: { params: Promise<{ slug: s
   const { slug, code: rawCode } = await params;
   const code = rawCode.toUpperCase();
   const data = await loadTournamentBySlug(slug);
-  if (!data) notFound();
+  if (!data) {
+    return <NotAvailable title="This tournament isn't available" description="It may have been deleted, or the link is incorrect." />;
+  }
 
   const { tournament, playerById, poolMatches, bracketMatches, poolStandings } = data;
   const player = [...playerById.values()].find((p) => p.code === code);
-  if (!player) notFound();
+  if (!player) {
+    return <NotAvailable title="We couldn't find that player" description="Double-check your code with the organizer, or that you're on the right tournament's link." />;
+  }
 
   const allMatches = [...poolMatches, ...bracketMatches];
   const myMatches = allMatches.filter((m) => m.player1Id === player.id || m.player2Id === player.id);

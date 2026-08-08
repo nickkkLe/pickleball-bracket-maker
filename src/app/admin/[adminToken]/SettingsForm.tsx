@@ -25,6 +25,7 @@ export function SettingsForm({ tournament, action }: { tournament: Tournament; a
 
   return (
     <form
+      key={tournament.updatedAt.getTime()}
       action={(fd) => {
         startTransition(async () => {
           try {

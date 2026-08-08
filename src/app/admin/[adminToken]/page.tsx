@@ -1,4 +1,3 @@
-import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowUpRight, CircleCheck, ListChecks, Trophy } from "lucide-react";
 import { loadTournamentByAdminToken, matchesToView } from "@/lib/tournamentData";
@@ -13,6 +12,7 @@ import { CopyField } from "@/components/CopyField";
 import { LiveRefresher } from "@/components/LiveRefresher";
 import { RecordAdminVisit } from "@/components/RecordAdminVisit";
 import { DeleteDivisionButton } from "@/components/DeleteDivisionButton";
+import { NotAvailable } from "@/components/NotAvailable";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertTitle, AlertDescription, AlertAction } from "@/components/ui/alert";
@@ -51,7 +51,9 @@ const FORMAT_LABEL: Record<string, string> = {
 export default async function AdminPage({ params }: { params: Promise<{ adminToken: string }> }) {
   const { adminToken } = await params;
   const data = await loadTournamentByAdminToken(adminToken);
-  if (!data) notFound();
+  if (!data) {
+    return <NotAvailable title="This bracket isn't available" description="It may have been deleted, or the link is incorrect." />;
+  }
 
   const { tournament, event, players, playerById, poolMatches, bracketMatches, poolStandings } = data;
   const bind = <T extends (id: string, token: string, ...rest: never[]) => Promise<void>>(fn: T) =>
@@ -172,6 +174,7 @@ export default async function AdminPage({ params }: { params: Promise<{ adminTok
                 <PlayerManager
                   players={players}
                   status={tournament.status}
+                  tournamentSlug={tournament.slug}
                   addPlayer={bind(addPlayer) as (fd: FormData) => Promise<void>}
                   addPlayersFromCsv={bind(addPlayersFromCsv) as (fd: FormData) => Promise<void>}
                   removePlayer={bind(removePlayer) as (fd: FormData) => Promise<void>}
