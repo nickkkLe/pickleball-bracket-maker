@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowUpRight, Settings2 } from "lucide-react";
 import { loadEventByAdminToken } from "@/lib/eventData";
 import { CopyField } from "@/components/CopyField";
-import { QrCode } from "@/components/QrCode";
+import { QrCodeDialog } from "@/components/QrCodeDialog";
 import { CreateTournamentForm } from "@/components/CreateTournamentForm";
 import { RecordAdminVisit } from "@/components/RecordAdminVisit";
 import { DeleteDivisionButton } from "@/components/DeleteDivisionButton";
@@ -11,6 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { createDivision } from "./actions";
 import { deleteDivision } from "@/app/admin/[adminToken]/actions";
+import { getQrDataUrl } from "@/lib/qrcode";
+import { getSiteOrigin } from "@/lib/site";
 
 const STATUS_META: Record<string, { label: string; variant: "outline" | "secondary" | "default" }> = {
   DRAFT: { label: "Draft", variant: "outline" },
@@ -33,8 +35,9 @@ export default async function EventAdminPage({ params }: { params: Promise<{ eve
     return <NotAvailable title="This event isn't available" description="It may have been deleted, or the link is incorrect." />;
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+  const siteUrl = await getSiteOrigin();
   const publicUrl = `${siteUrl}/e/${data.event.slug}`;
+  const qrDataUrl = await getQrDataUrl(publicUrl);
   const action = createDivision.bind(null, data.event.id, eventAdminToken) as (formData: FormData) => Promise<void>;
 
   return (
@@ -50,9 +53,12 @@ export default async function EventAdminPage({ params }: { params: Promise<{ eve
 
       <div className="mb-8 grid gap-6 sm:grid-cols-[auto_1fr]">
         <div className="flex justify-center sm:justify-start">
-          <div className="rounded-xl border border-border bg-white p-3">
-            <QrCode value={publicUrl || "/"} size={160} />
-          </div>
+          <QrCodeDialog
+            dataUrl={qrDataUrl}
+            thumbnailSize={160}
+            title={data.event.name}
+            description="Players scan this to see all brackets in this event and check in."
+          />
         </div>
         <div className="flex flex-col justify-center gap-2">
           <p className="text-sm text-muted-foreground">

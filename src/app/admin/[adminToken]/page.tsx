@@ -13,7 +13,9 @@ import { LiveRefresher } from "@/components/LiveRefresher";
 import { RecordAdminVisit } from "@/components/RecordAdminVisit";
 import { DeleteDivisionButton } from "@/components/DeleteDivisionButton";
 import { NotAvailable } from "@/components/NotAvailable";
-import { QrCode } from "@/components/QrCode";
+import { QrCodeDialog } from "@/components/QrCodeDialog";
+import { getQrDataUrl } from "@/lib/qrcode";
+import { getSiteOrigin } from "@/lib/site";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertTitle, AlertDescription, AlertAction } from "@/components/ui/alert";
@@ -61,8 +63,9 @@ export default async function AdminPage({ params }: { params: Promise<{ adminTok
     fn.bind(null, tournament.id, tournament.adminToken) as (...args: never[]) => Promise<void>;
 
   const checkedInCount = players.filter((p) => p.checkedIn).length;
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+  const siteUrl = await getSiteOrigin();
   const publicUrl = `${siteUrl}/t/${tournament.slug}`;
+  const qrDataUrl = await getQrDataUrl(publicUrl);
 
   const isPoolFormat = tournament.format === "ROUND_ROBIN" || tournament.format === "POOL_PLAY";
   const poolsComplete = poolMatches.length > 0 && poolMatches.every((m) => m.status === "COMPLETE");
@@ -98,9 +101,7 @@ export default async function AdminPage({ params }: { params: Promise<{ adminTok
           <p className="mt-1 text-sm text-muted-foreground">{FORMAT_LABEL[tournament.format]}</p>
         </div>
         <div className="flex w-full max-w-sm gap-3 sm:w-auto">
-          <div className="shrink-0 self-start rounded-lg border border-border bg-white p-1.5">
-            <QrCode value={publicUrl || `/t/${tournament.slug}`} size={88} />
-          </div>
+          <QrCodeDialog dataUrl={qrDataUrl} title={tournament.name} description="Players scan this to check in and enter scores." />
           <div className="min-w-0 flex-1">
             <CopyField label="Share this with players" value={publicUrl || `/t/${tournament.slug}`} />
             <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
