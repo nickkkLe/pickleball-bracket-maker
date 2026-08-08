@@ -8,6 +8,7 @@ import { AdminMatchActions } from "./AdminMatchActions";
 import { BracketView } from "@/components/BracketView";
 import { PoolStandings } from "@/components/PoolStandings";
 import { PoolMatchList } from "@/components/PoolMatchList";
+import { AuditLog } from "@/components/AuditLog";
 import { CopyField } from "@/components/CopyField";
 import { LiveRefresher } from "@/components/LiveRefresher";
 import { RecordAdminVisit } from "@/components/RecordAdminVisit";
@@ -33,6 +34,7 @@ import {
   generateBracketAction,
   generatePlayoffAction,
   adminRecordScore,
+  adminEditScore,
   adminSetCourt,
   deleteDivision,
 } from "./actions";
@@ -74,6 +76,7 @@ export default async function AdminPage({ params }: { params: Promise<{ adminTok
   const status = STATUS_META[tournament.status];
 
   const recordScore = bind(adminRecordScore) as (fd: FormData) => Promise<void>;
+  const editScore = bind(adminEditScore) as (fd: FormData) => Promise<void>;
   const setCourt = bind(adminSetCourt) as (fd: FormData) => Promise<void>;
 
   return (
@@ -173,6 +176,7 @@ export default async function AdminPage({ params }: { params: Promise<{ adminTok
             <TabsTrigger value="bracket" disabled={!hasBracketContent}>
               {tournament.format === "POOL_PLAY" || tournament.format === "ROUND_ROBIN" ? "Pools" : "Bracket"}
             </TabsTrigger>
+            <TabsTrigger value="activity">Activity</TabsTrigger>
           </TabsList>
 
           <TabsContent value="players" className="pt-4">
@@ -215,7 +219,7 @@ export default async function AdminPage({ params }: { params: Promise<{ adminTok
                   <PoolMatchList
                     pools={data.pools}
                     matches={matchesToView(poolMatches, playerById)}
-                    renderActions={(m) => <AdminMatchActions match={m} recordScore={recordScore} setCourt={setCourt} />}
+                    renderActions={(m) => <AdminMatchActions match={m} recordScore={recordScore} editScore={editScore} setCourt={setCourt} />}
                   />
                 </CardContent>
               </Card>
@@ -229,11 +233,22 @@ export default async function AdminPage({ params }: { params: Promise<{ adminTok
                 <CardContent>
                   <BracketView
                     matches={matchesToView(bracketMatches, playerById)}
-                    renderActions={(m) => <AdminMatchActions match={m} recordScore={recordScore} setCourt={setCourt} />}
+                    renderActions={(m) => <AdminMatchActions match={m} recordScore={recordScore} editScore={editScore} setCourt={setCourt} />}
                   />
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          <TabsContent value="activity" className="pt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Activity log</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <AuditLog entries={data.auditLog} />
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
 

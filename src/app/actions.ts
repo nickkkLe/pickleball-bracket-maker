@@ -4,8 +4,11 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { newAdminToken, newSlug } from "@/lib/ids";
 import { parseDivisionInput } from "@/lib/divisionInput";
+import { requireAdmin } from "@/lib/adminAuth";
+import { logAudit } from "@/lib/audit";
 
 export async function createTournament(formData: FormData) {
+  await requireAdmin();
   const data = parseDivisionInput(formData);
 
   const eventSlug = newSlug(data.name);
@@ -13,7 +16,7 @@ export async function createTournament(formData: FormData) {
   const divisionSlug = newSlug(data.name);
   const divisionAdminToken = newAdminToken();
 
-  await prisma.event.create({
+  const event = await prisma.event.create({
     data: {
       name: data.name,
       slug: eventSlug,
@@ -33,7 +36,10 @@ export async function createTournament(formData: FormData) {
         },
       },
     },
+    include: { divisions: true },
   });
+
+  await logAudit(event.divisions[0].id, "admin", "tournament.create", `Tournament "${data.name}" created`);
 
   redirect(`/admin/${divisionAdminToken}`);
 }

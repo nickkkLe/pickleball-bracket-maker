@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+
 export const ADMIN_AUTH_COOKIE = "pbb_admin_ok";
 
 function getPasscode(): string {
@@ -18,4 +20,18 @@ export async function expectedAdminCookieValue(): Promise<string> {
 
 export function checkAdminPasscode(input: string): boolean {
   return input === getPasscode();
+}
+
+export async function isAdminRequest(): Promise<boolean> {
+  const cookieStore = await cookies();
+  return cookieStore.get(ADMIN_AUTH_COOKIE)?.value === (await expectedAdminCookieValue());
+}
+
+/** Server Functions are reachable directly (not just through the UI), so any
+ * mutation that should be admin-only must check this itself — hiding the
+ * button is not enough. */
+export async function requireAdmin(): Promise<void> {
+  if (!(await isAdminRequest())) {
+    throw new Error("Admin access required.");
+  }
 }

@@ -169,3 +169,107 @@ export async function recordMatchResult(input: RecordResultInput) {
     return updated;
   });
 }
+
+/**
+ * Corrects an already-final match's score. Fixing a typo (same winner, new
+ * point totals) is always safe. Flipping the winner is only allowed while
+ * nothing downstream has been decided from the original result yet — once a
+ * match this one fed into (winner or loser side), a bracket-reset game, or a
+ * generated playoff bracket has been played/created off of it, the edit is
+ * rejected rather than silently leaving the bracket inconsistent.
+ */
+export async function editMatchResult(input: RecordResultInput) {
+  return prisma.$transaction(async (tx) => {
+    const match = await tx.match.findUnique({ where: { id: input.matchId } });
+    if (!match) throw new MatchResultError("Match not found");
+    if (match.status !== "COMPLETE") {
+      throw new MatchResultError("This match hasn't been scored yet — use the score form instead of edit.");
+    }
+    if (!match.player1Id || !match.player2Id) {
+      throw new MatchResultError("Match is missing a player");
+    }
+    if (input.player1Score === input.player2Score) {
+      throw new MatchResultError("Scores cannot be tied");
+    }
+
+    const newWinnerId = input.player1Score > input.player2Score ? match.player1Id : match.player2Id;
+    const newLoserId = newWinnerId === match.player1Id ? match.player2Id : match.player1Id;
+    const winnerChanged = newWinnerId !== match.winnerId;
+
+    if (winnerChanged) {
+      if (match.stage === "POOL") {
+        const tournament = await tx.tournament.findUniqueOrThrow({ where: { id: match.tournamentId } });
+        if (tournament.format === "POOL_PLAY") {
+          const playoffGenerated = await tx.match.count({ where: { tournamentId: match.tournamentId, stage: "BRACKET" } });
+          if (playoffGenerated > 0) {
+            throw new MatchResultError("Can't change the winner: the playoff bracket has already been generated from pool standings.");
+          }
+        }
+      } else {
+        if (match.nextMatchId) {
+          const next = await tx.match.findUnique({ where: { id: match.nextMatchId } });
+          if (next?.status === "COMPLETE") {
+            throw new MatchResultError("Can't change the winner: the next match has already been played from this result. Fix that match first.");
+          }
+        }
+        if (match.nextLoserMatchId) {
+          const nextLoser = await tx.match.findUnique({ where: { id: match.nextLoserMatchId } });
+          if (nextLoser?.status === "COMPLETE") {
+            throw new MatchResultError("Can't change the winner: the losers-bracket match it fed into has already been played. Fix that match first.");
+          }
+        }
+        if (match.bracketSide === "GRAND_FINAL" && !match.isBracketReset) {
+          const reset = await tx.match.findFirst({
+            where: { tournamentId: match.tournamentId, bracketSide: "GRAND_FINAL", isBracketReset: true },
+          });
+          if (reset?.status === "COMPLETE") {
+            throw new MatchResultError("Can't change the winner: the bracket-reset game has already been played.");
+          }
+        }
+      }
+    }
+
+    const updated = await tx.match.update({
+      where: { id: match.id },
+      data: {
+        player1Score: input.player1Score,
+        player2Score: input.player2Score,
+        games: input.games ? (input.games as unknown as Prisma.InputJsonValue) : undefined,
+        winnerId: newWinnerId,
+      },
+    });
+
+    if (!winnerChanged) return updated;
+
+    if (updated.nextMatchId && updated.nextMatchSlot) {
+      await fillSlot(tx, updated.nextMatchId, updated.nextMatchSlot, newWinnerId);
+    }
+    if (updated.nextLoserMatchId && updated.nextLoserMatchSlot) {
+      await fillSlot(tx, updated.nextLoserMatchId, updated.nextLoserMatchSlot, newLoserId);
+    }
+
+    if (updated.bracketSide === "GRAND_FINAL" && !updated.isBracketReset) {
+      const pendingReset = await tx.match.findFirst({
+        where: { tournamentId: updated.tournamentId, bracketSide: "GRAND_FINAL", isBracketReset: true, status: { not: "COMPLETE" } },
+      });
+      const resetStillWarranted = newWinnerId === updated.player2Id;
+      if (pendingReset && !resetStillWarranted) {
+        await tx.match.delete({ where: { id: pendingReset.id } });
+      }
+    }
+
+    await maybeHandleGrandFinal(tx, updated);
+
+    if (updated.stage === "BRACKET" && updated.bracketSide !== "GRAND_FINAL" && !updated.nextMatchId) {
+      const remaining = await tx.match.count({
+        where: { tournamentId: updated.tournamentId, stage: "BRACKET", status: { not: "COMPLETE" } },
+      });
+      await tx.tournament.update({
+        where: { id: updated.tournamentId },
+        data: { status: remaining === 0 ? "COMPLETE" : "IN_PROGRESS" },
+      });
+    }
+
+    return updated;
+  });
+}

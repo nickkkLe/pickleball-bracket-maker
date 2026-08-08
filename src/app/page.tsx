@@ -1,20 +1,23 @@
-import { cookies } from "next/headers";
-import { Trophy, LayoutDashboard } from "lucide-react";
+import Link from "next/link";
+import { Trophy, LayoutDashboard, Lock } from "lucide-react";
 import { CreateTournamentForm } from "@/components/CreateTournamentForm";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { YourDashboards } from "@/components/YourDashboards";
 import { AllTournamentsList } from "@/components/AllTournamentsList";
+import { PublicTournamentsList } from "@/components/PublicTournamentsList";
 import { createTournament } from "@/app/actions";
-import { ADMIN_AUTH_COOKIE, expectedAdminCookieValue } from "@/lib/adminAuth";
-import { listAllEvents } from "@/lib/eventData";
+import { isAdminRequest } from "@/lib/adminAuth";
+import { listAllEvents, listAllEventsPublic } from "@/lib/eventData";
+
+// This lists live tournament data — never prerender/cache it statically.
+export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const cookieStore = await cookies();
-  const isAdmin = cookieStore.get(ADMIN_AUTH_COOKIE)?.value === (await expectedAdminCookieValue());
+  const isAdmin = await isAdminRequest();
 
   return (
     <div className="mx-auto w-full max-w-xl flex-1 px-4 py-14 sm:py-20">
-      {isAdmin ? <AdminTournamentsSection /> : <YourDashboards />}
+      {isAdmin ? <AdminTournamentsSection /> : <PublicTournamentsSection />}
       <div className="mb-8 text-center">
         <div className="mb-4 inline-flex size-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
           <Trophy className="size-5" />
@@ -26,12 +29,24 @@ export default async function Home() {
           Mixed)? Add more from the dashboard after creating your first one.
         </p>
       </div>
-      <Card className="shadow-sm">
-        <CardHeader className="sr-only">New tournament</CardHeader>
-        <CardContent>
-          <CreateTournamentForm action={createTournament} />
-        </CardContent>
-      </Card>
+      {isAdmin ? (
+        <Card className="shadow-sm">
+          <CardHeader className="sr-only">New tournament</CardHeader>
+          <CardContent>
+            <CreateTournamentForm action={createTournament} />
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="shadow-sm">
+          <CardContent className="flex flex-col items-center gap-2 py-8 text-center">
+            <Lock className="size-5 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Only the organizer can create a new tournament.</p>
+            <Link href="/admin/passcode" className="text-xs font-medium text-primary hover:underline">
+              Are you the organizer? Enter the admin passcode
+            </Link>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
@@ -45,6 +60,20 @@ async function AdminTournamentsSection() {
         All tournaments (you&apos;re signed in as admin)
       </h2>
       <AllTournamentsList events={events} />
+    </div>
+  );
+}
+
+async function PublicTournamentsSection() {
+  const events = await listAllEventsPublic();
+  return (
+    <div className="mb-6">
+      <YourDashboards />
+      <h2 className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+        <LayoutDashboard className="size-3.5" />
+        All tournaments
+      </h2>
+      <PublicTournamentsList events={events} />
     </div>
   );
 }

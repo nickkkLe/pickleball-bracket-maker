@@ -5,7 +5,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { newPlayerCode } from "@/lib/ids";
 import { generateInitialBracket, generatePlayoffBracket, BracketGenerationError } from "@/lib/bracket/generate";
-import { recordMatchResult, MatchResultError } from "@/lib/bracket/progress";
+import { recordMatchResult, editMatchResult, MatchResultError } from "@/lib/bracket/progress";
+import { logAudit } from "@/lib/audit";
 
 async function requireAdmin(tournamentId: string, adminToken: string) {
   const t = await prisma.tournament.findUnique({ where: { id: tournamentId } });
@@ -39,6 +40,7 @@ export async function addPlayer(tournamentId: string, adminToken: string, formDa
   await prisma.player.create({
     data: { tournamentId, name, rating: rating !== null && Number.isFinite(rating) ? rating : null, seed: count + 1, code },
   });
+  await logAudit(tournamentId, "admin", "player.add", `Added player "${name}"`);
   refresh(adminToken, t.slug);
 }
 
@@ -51,6 +53,7 @@ export async function addPlayersFromCsv(tournamentId: string, adminToken: string
     .filter(Boolean);
 
   let seed = await prisma.player.count({ where: { tournamentId } });
+  let added = 0;
   for (const line of lines) {
     const [namePart, ratingPart] = line.split(",");
     const name = (namePart || "").trim();
@@ -61,7 +64,9 @@ export async function addPlayersFromCsv(tournamentId: string, adminToken: string
     await prisma.player.create({
       data: { tournamentId, name, rating: Number.isFinite(ratingNum) ? ratingNum : null, seed, code },
     });
+    added += 1;
   }
+  if (added > 0) await logAudit(tournamentId, "admin", "player.import", `Imported ${added} player${added === 1 ? "" : "s"} from CSV`);
   refresh(adminToken, t.slug);
 }
 
@@ -71,10 +76,12 @@ export async function removePlayer(tournamentId: string, adminToken: string, for
     throw new Error("Players can't be removed after the bracket has been generated");
   }
   const playerId = String(formData.get("playerId"));
+  const player = await prisma.player.findUniqueOrThrow({ where: { id: playerId } });
   await prisma.player.delete({ where: { id: playerId } });
 
   const remaining = await prisma.player.findMany({ where: { tournamentId }, orderBy: { seed: "asc" } });
   await prisma.$transaction(remaining.map((p, i) => prisma.player.update({ where: { id: p.id }, data: { seed: i + 1 } })));
+  await logAudit(tournamentId, "admin", "player.remove", `Removed player "${player.name}"`);
   refresh(adminToken, t.slug);
 }
 
@@ -92,6 +99,7 @@ export async function setPlayerSeed(tournamentId: string, adminToken: string, fo
   players.splice(clamped - 1, 0, moved);
 
   await prisma.$transaction(players.map((p, i) => prisma.player.update({ where: { id: p.id }, data: { seed: i + 1 } })));
+  await logAudit(tournamentId, "admin", "player.reseed", `Moved "${moved.name}" to seed #${clamped}`);
   refresh(adminToken, t.slug);
 }
 
@@ -100,6 +108,7 @@ export async function randomizeSeeds(tournamentId: string, adminToken: string) {
   const players = await prisma.player.findMany({ where: { tournamentId } });
   const shuffled = [...players].sort(() => Math.random() - 0.5);
   await prisma.$transaction(shuffled.map((p, i) => prisma.player.update({ where: { id: p.id }, data: { seed: i + 1 } })));
+  await logAudit(tournamentId, "admin", "player.reseed", "Randomized player seeding");
   refresh(adminToken, t.slug);
 }
 
@@ -108,6 +117,7 @@ export async function seedByRating(tournamentId: string, adminToken: string) {
   const players = await prisma.player.findMany({ where: { tournamentId } });
   const sorted = [...players].sort((a, b) => (b.rating ?? -Infinity) - (a.rating ?? -Infinity));
   await prisma.$transaction(sorted.map((p, i) => prisma.player.update({ where: { id: p.id }, data: { seed: i + 1 } })));
+  await logAudit(tournamentId, "admin", "player.reseed", "Re-seeded players by rating");
   refresh(adminToken, t.slug);
 }
 
@@ -152,6 +162,7 @@ export async function updateSettings(tournamentId: string, adminToken: string, f
       playoffFormat: data.playoffFormat,
     },
   });
+  await logAudit(tournamentId, "admin", "settings.update", `Updated settings (format: ${data.format})`);
   refresh(adminToken, t.slug);
 }
 
@@ -161,6 +172,7 @@ export async function openCheckIn(tournamentId: string, adminToken: string) {
   const count = await prisma.player.count({ where: { tournamentId } });
   if (count < 2) throw new Error("Add at least 2 players first");
   await prisma.tournament.update({ where: { id: tournamentId }, data: { status: "CHECK_IN" } });
+  await logAudit(tournamentId, "admin", "checkin.open", "Opened check-in");
   refresh(adminToken, t.slug);
 }
 
@@ -172,6 +184,7 @@ export async function adminToggleCheckIn(tournamentId: string, adminToken: strin
     where: { id: playerId },
     data: { checkedIn: !player.checkedIn, checkedInAt: !player.checkedIn ? new Date() : null },
   });
+  await logAudit(tournamentId, "admin", "checkin.toggle", `${player.checkedIn ? "Checked out" : "Checked in"} "${player.name}"`);
   refresh(adminToken, t.slug);
 }
 
@@ -184,6 +197,7 @@ export async function generateBracketAction(tournamentId: string, adminToken: st
     if (err instanceof BracketGenerationError) throw new Error(err.message);
     throw err;
   }
+  await logAudit(tournamentId, "admin", "bracket.generate", `Generated the bracket (${checkedInOnly ? "checked-in players only" : "all players"})`);
   refresh(adminToken, t.slug);
 }
 
@@ -195,7 +209,17 @@ export async function generatePlayoffAction(tournamentId: string, adminToken: st
     if (err instanceof BracketGenerationError) throw new Error(err.message);
     throw err;
   }
+  await logAudit(tournamentId, "admin", "bracket.generate", "Generated the playoff bracket from pool standings");
   refresh(adminToken, t.slug);
+}
+
+async function matchupLabel(match: { player1Id: string | null; player2Id: string | null }): Promise<string> {
+  const ids = [match.player1Id, match.player2Id].filter((id): id is string => Boolean(id));
+  const players = await prisma.player.findMany({ where: { id: { in: ids } } });
+  const byId = new Map(players.map((p) => [p.id, p.name]));
+  const p1 = match.player1Id ? (byId.get(match.player1Id) ?? "?") : "?";
+  const p2 = match.player2Id ? (byId.get(match.player2Id) ?? "?") : "?";
+  return `${p1} vs ${p2}`;
 }
 
 export async function adminRecordScore(tournamentId: string, adminToken: string, formData: FormData) {
@@ -212,6 +236,32 @@ export async function adminRecordScore(tournamentId: string, adminToken: string,
     if (err instanceof MatchResultError) throw new Error(err.message);
     throw err;
   }
+  const label = await matchupLabel(match);
+  await logAudit(tournamentId, "admin", "score.record", `Recorded score for ${label}: ${player1Score}-${player2Score}`);
+  refresh(adminToken, t.slug);
+}
+
+export async function adminEditScore(tournamentId: string, adminToken: string, formData: FormData) {
+  const t = await requireAdmin(tournamentId, adminToken);
+  const matchId = String(formData.get("matchId"));
+  const match = await prisma.match.findUniqueOrThrow({ where: { id: matchId } });
+  if (match.tournamentId !== tournamentId) throw new Error("Not authorized");
+
+  const player1Score = Number(formData.get("player1Score"));
+  const player2Score = Number(formData.get("player2Score"));
+  try {
+    await editMatchResult({ matchId, player1Score, player2Score });
+  } catch (err) {
+    if (err instanceof MatchResultError) throw new Error(err.message);
+    throw err;
+  }
+  const label = await matchupLabel(match);
+  await logAudit(
+    tournamentId,
+    "admin",
+    "score.edit",
+    `Edited score for ${label}: was ${match.player1Score}-${match.player2Score}, now ${player1Score}-${player2Score}`
+  );
   refresh(adminToken, t.slug);
 }
 

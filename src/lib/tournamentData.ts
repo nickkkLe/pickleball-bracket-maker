@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { computeStandings, type StandingRow } from "@/lib/bracket/standings";
-import type { Match, Player, Pool, Tournament } from "@/generated/prisma/client";
+import type { AuditLogEntry, Match, Player, Pool, Tournament } from "@/generated/prisma/client";
 
 export interface MatchView {
   id: string;
@@ -34,6 +34,7 @@ export interface TournamentData {
   poolMatches: Match[];
   bracketMatches: Match[];
   poolStandings: PoolStandingsData[];
+  auditLog: AuditLogEntry[];
 }
 
 function toView(m: Match, playerById: Map<string, Player>): MatchView {
@@ -62,11 +63,12 @@ async function loadTournament(where: { slug: string } | { adminToken: string } |
   const tournament = await prisma.tournament.findUnique({ where, include: { event: true } });
   if (!tournament) return null;
 
-  const [players, pools, matches, divisionCount] = await Promise.all([
+  const [players, pools, matches, divisionCount, auditLog] = await Promise.all([
     prisma.player.findMany({ where: { tournamentId: tournament.id }, orderBy: { seed: "asc" } }),
     prisma.pool.findMany({ where: { tournamentId: tournament.id }, orderBy: { name: "asc" } }),
     prisma.match.findMany({ where: { tournamentId: tournament.id }, orderBy: [{ round: "asc" }, { position: "asc" }] }),
     prisma.tournament.count({ where: { eventId: tournament.eventId } }),
+    prisma.auditLogEntry.findMany({ where: { tournamentId: tournament.id }, orderBy: { createdAt: "desc" }, take: 200 }),
   ]);
 
   const playerById = new Map(players.map((p) => [p.id, p]));
@@ -90,6 +92,7 @@ async function loadTournament(where: { slug: string } | { adminToken: string } |
     poolMatches,
     bracketMatches,
     poolStandings,
+    auditLog,
   };
 }
 

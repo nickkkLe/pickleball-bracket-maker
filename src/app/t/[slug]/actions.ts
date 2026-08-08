@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { recordMatchResult, MatchResultError } from "@/lib/bracket/progress";
+import { logAudit } from "@/lib/audit";
 
 async function findPlayerByCode(slug: string, rawCode: string) {
   const code = rawCode.trim().toUpperCase();
@@ -21,9 +22,10 @@ export async function goToPlayerPage(slug: string, formData: FormData) {
 }
 
 export async function playerCheckIn(slug: string, code: string) {
-  const { player } = await findPlayerByCode(slug, code);
+  const { tournament, player } = await findPlayerByCode(slug, code);
   if (!player.checkedIn) {
     await prisma.player.update({ where: { id: player.id }, data: { checkedIn: true, checkedInAt: new Date() } });
+    await logAudit(tournament.id, "player", "checkin", `"${player.name}" checked in`);
   }
   revalidatePath(`/t/${slug}`);
   revalidatePath(`/t/${slug}/p/${player.code}`);
@@ -46,6 +48,14 @@ export async function playerRecordScore(slug: string, code: string, formData: Fo
     if (err instanceof MatchResultError) throw new Error(err.message);
     throw err;
   }
+  const opponentId = match.player1Id === player.id ? match.player2Id : match.player1Id;
+  const opponent = opponentId ? await prisma.player.findUnique({ where: { id: opponentId } }) : null;
+  await logAudit(
+    tournament.id,
+    "player",
+    "score.record",
+    `"${player.name}" reported a score vs "${opponent?.name ?? "?"}": ${player1Score}-${player2Score}`
+  );
   revalidatePath(`/t/${slug}`);
   revalidatePath(`/t/${slug}/p/${player.code}`);
 }

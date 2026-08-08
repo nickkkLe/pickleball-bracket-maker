@@ -57,6 +57,39 @@ export function loadEventBySlug(slug: string) {
   return loadEvent({ slug });
 }
 
+export interface PublicDivisionSummary {
+  id: string;
+  name: string;
+  slug: string;
+  format: string;
+  status: string;
+  playerCount: number;
+  checkedInCount: number;
+}
+
+export interface PublicEventData {
+  event: { id: string; name: string; slug: string };
+  divisions: PublicDivisionSummary[];
+}
+
+/** Same listing as `listAllEvents`, but stripped of admin tokens — safe to
+ * render for anyone, not just an authenticated admin. */
+export async function listAllEventsPublic(): Promise<PublicEventData[]> {
+  const events = await listAllEvents();
+  return events.map(({ event, divisions }) => ({
+    event: { id: event.id, name: event.name, slug: event.slug },
+    divisions: divisions.map(({ id, name, slug, format, status, playerCount, checkedInCount }) => ({
+      id,
+      name,
+      slug,
+      format,
+      status,
+      playerCount,
+      checkedInCount,
+    })),
+  }));
+}
+
 export function loadEventByAdminToken(adminToken: string) {
   return loadEvent({ adminToken });
 }

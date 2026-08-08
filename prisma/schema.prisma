@@ -78,6 +78,7 @@ model Tournament {
   players Player[]
   pools   Pool[]
   matches Match[]
+  auditLog AuditLogEntry[]
 
   @@index([slug])
   @@index([adminToken])
@@ -169,4 +170,18 @@ model Match {
   @@index([poolId])
   @@index([nextMatchId])
   @@index([nextLoserMatchId])
+}
+
+model AuditLogEntry {
+  id           String     @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  actor   String
+  action  String
+  message String
+
+  createdAt DateTime @default(now())
+
+  @@index([tournamentId, createdAt])
 }

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { newAdminToken, newSlug } from "@/lib/ids";
 import { parseDivisionInput } from "@/lib/divisionInput";
+import { logAudit } from "@/lib/audit";
 
 async function requireEventAdmin(eventId: string, adminToken: string) {
   const event = await prisma.event.findUnique({ where: { id: eventId } });
@@ -19,7 +20,7 @@ export async function createDivision(eventId: string, eventAdminToken: string, f
   const slug = newSlug(`${event.name}-${data.name}`);
   const adminToken = newAdminToken();
 
-  await prisma.tournament.create({
+  const division = await prisma.tournament.create({
     data: {
       eventId: event.id,
       name: data.name,
@@ -34,6 +35,8 @@ export async function createDivision(eventId: string, eventAdminToken: string, f
       playoffFormat: data.playoffFormat,
     },
   });
+
+  await logAudit(division.id, "admin", "tournament.create", `Bracket "${data.name}" added to event "${event.name}"`);
 
   revalidatePath(`/admin/e/${eventAdminToken}`);
   redirect(`/admin/${adminToken}`);
