@@ -56,6 +56,7 @@ Create a tournament, seed your players, and share one link. Players check themse
 3. **Import the project into Vercel** (vercel.com/new) and set these Environment Variables:
    - `DATABASE_URL` — the Neon connection string from step 2 (skip this if you used Vercel's own Postgres integration; it sets this for you).
    - `NEXT_PUBLIC_SITE_URL` — your production URL, e.g. `https://your-project.vercel.app` (used to build the shareable link shown on the admin dashboard; the app still works without it, it just falls back to a relative link).
+   - `ADMIN_PASSCODE` — change this from the default (`pickleball`) before sharing your deployed URL publicly. Every `/admin/*` page is gated behind this single shared passcode (see [Known limitations](#known-limitations)).
 
 4. **Run the migration against production** once, from your machine, pointed at the same `DATABASE_URL` you gave Vercel:
 
@@ -84,3 +85,4 @@ Every tournament you create belongs to an **event** — that's what lets one phy
 - **Scores can't be edited once a match is marked final.** Correcting a bad entry isn't supported yet — un-doing a completed match would need to walk back anything that already advanced because of it (byes it triggered, a bracket-reset game it caused, and so on). If this matters for your event, the safest fix today is to edit the row directly in the database.
 - **No dispute/confirmation step.** Either player's score submission is taken as final immediately; there's no "both players confirm" flow. For casual/rec play this is usually fine — for anything higher-stakes, an admin can act as the sole scorekeeper instead of opening scoring to players.
 - **Court assignment is manual and freeform** (a plain text field per match) — there's no court-count setting or auto-assignment.
+- **The admin passcode is one shared word, not per-tournament auth.** It's a light deterrent (set via `ADMIN_PASSCODE`, defaults to `pickleball`) that gates the whole `/admin` area behind a single "quick screen" — anyone who has the passcode and finds/guesses an admin URL can manage that tournament. The tournament-specific admin link itself (a long random token) is still the real access control; the passcode is an extra speed bump on top, not a replacement for it.
