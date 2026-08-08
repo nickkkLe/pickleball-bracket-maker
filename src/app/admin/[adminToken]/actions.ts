@@ -224,3 +224,21 @@ export async function adminSetCourt(tournamentId: string, adminToken: string, fo
   await prisma.match.update({ where: { id: matchId }, data: { court: court || null } });
   refresh(adminToken, t.slug);
 }
+
+export async function deleteDivision(tournamentId: string, adminToken: string) {
+  const t = await requireAdmin(tournamentId, adminToken);
+  const event = await prisma.event.findUniqueOrThrow({ where: { id: t.eventId } });
+
+  await prisma.tournament.delete({ where: { id: tournamentId } });
+
+  const remaining = await prisma.tournament.count({ where: { eventId: event.id } });
+  if (remaining === 0) {
+    await prisma.event.delete({ where: { id: event.id } });
+  }
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath(`/admin/e/${event.adminToken}`);
+  revalidatePath(`/e/${event.slug}`);
+  revalidatePath(`/t/${t.slug}`);
+}

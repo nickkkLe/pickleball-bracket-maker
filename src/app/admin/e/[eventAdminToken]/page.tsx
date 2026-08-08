@@ -6,9 +6,11 @@ import { CopyField } from "@/components/CopyField";
 import { QrCode } from "@/components/QrCode";
 import { CreateTournamentForm } from "@/components/CreateTournamentForm";
 import { RecordAdminVisit } from "@/components/RecordAdminVisit";
+import { DeleteDivisionButton } from "@/components/DeleteDivisionButton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { createDivision } from "./actions";
+import { deleteDivision } from "@/app/admin/[adminToken]/actions";
 
 const STATUS_META: Record<string, { label: string; variant: "outline" | "secondary" | "default" }> = {
   DRAFT: { label: "Draft", variant: "outline" },
@@ -89,6 +91,7 @@ export default async function EventAdminPage({ params }: { params: Promise<{ eve
                       <Settings2 className="size-3" />
                       Manage
                     </Link>
+                    <DeleteDivisionButton name={d.name} action={deleteDivision.bind(null, d.id, d.adminToken) as () => Promise<void>} />
                   </div>
                 </CardContent>
               </Card>

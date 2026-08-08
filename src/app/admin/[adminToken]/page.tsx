@@ -12,6 +12,7 @@ import { PoolMatchList } from "@/components/PoolMatchList";
 import { CopyField } from "@/components/CopyField";
 import { LiveRefresher } from "@/components/LiveRefresher";
 import { RecordAdminVisit } from "@/components/RecordAdminVisit";
+import { DeleteDivisionButton } from "@/components/DeleteDivisionButton";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertTitle, AlertDescription, AlertAction } from "@/components/ui/alert";
@@ -30,6 +31,7 @@ import {
   generatePlayoffAction,
   adminRecordScore,
   adminSetCourt,
+  deleteDivision,
 } from "./actions";
 
 const STATUS_META: Record<string, { label: string; variant: "outline" | "secondary" | "default" }> = {
@@ -224,6 +226,16 @@ export default async function AdminPage({ params }: { params: Promise<{ adminTok
             )}
           </TabsContent>
         </Tabs>
+
+        <Card className="border-destructive/30">
+          <CardHeader>
+            <CardTitle className="text-destructive">Danger zone</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">Permanently delete this bracket, its players, and all match results.</p>
+            <DeleteDivisionButton name={tournament.name} action={bind(deleteDivision) as () => Promise<void>} redirectTo="/admin" variant="full" />
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

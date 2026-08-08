@@ -3,6 +3,8 @@ import { ArrowUpRight, Settings2 } from "lucide-react";
 import type { EventData } from "@/lib/eventData";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { DeleteDivisionButton } from "@/components/DeleteDivisionButton";
+import { deleteDivision } from "@/app/admin/[adminToken]/actions";
 
 const STATUS_META: Record<string, { label: string; variant: "outline" | "secondary" | "default" }> = {
   DRAFT: { label: "Draft", variant: "outline" },
@@ -72,6 +74,7 @@ export function AllTournamentsList({ events }: { events: EventData[] }) {
                       <Link href={`/admin/${d.adminToken}`} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
                         Manage
                       </Link>
+                      <DeleteDivisionButton name={d.name} action={deleteDivision.bind(null, d.id, d.adminToken) as () => Promise<void>} />
                     </div>
                   </div>
                 );
