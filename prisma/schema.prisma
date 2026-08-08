@@ -1,0 +1,172 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TournamentFormat {
+  SINGLE_ELIM
+  DOUBLE_ELIM
+  ROUND_ROBIN
+  POOL_PLAY
+}
+
+enum TournamentStatus {
+  DRAFT
+  CHECK_IN
+  IN_PROGRESS
+  COMPLETE
+}
+
+enum MatchStage {
+  POOL
+  BRACKET
+}
+
+enum BracketSide {
+  WINNERS
+  LOSERS
+  GRAND_FINAL
+}
+
+enum MatchStatus {
+  PENDING
+  READY
+  COMPLETE
+}
+
+model Event {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  adminToken String  @unique
+  createdAt DateTime @default(now())
+
+  divisions Tournament[]
+
+  @@index([slug])
+  @@index([adminToken])
+}
+
+model Tournament {
+  id        String            @id @default(cuid())
+  eventId   String
+  event     Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name      String
+  slug      String            @unique
+  adminToken String           @unique
+  format    TournamentFormat
+  status    TournamentStatus  @default(DRAFT)
+
+  // Scoring settings
+  pointsToWin   Int     @default(11)
+  winByTwo      Boolean @default(true)
+  gamesPerMatch Int     @default(1)
+
+  // Round robin / pool play settings
+  poolCount      Int              @default(1)
+  advancePerPool Int              @default(2)
+  playoffFormat  TournamentFormat @default(SINGLE_ELIM)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  players Player[]
+  pools   Pool[]
+  matches Match[]
+
+  @@index([slug])
+  @@index([adminToken])
+  @@index([eventId])
+}
+
+model Player {
+  id          String    @id @default(cuid())
+  tournamentId String
+  tournament  Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  name      String
+  seed      Int
+  rating    Float?
+  code      String
+  checkedIn Boolean   @default(false)
+  checkedInAt DateTime?
+
+  poolId String?
+  pool   Pool?   @relation(fields: [poolId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  matchesAsPlayer1 Match[] @relation("Player1Matches")
+  matchesAsPlayer2 Match[] @relation("Player2Matches")
+  matchesWon       Match[] @relation("MatchWinner")
+
+  @@unique([tournamentId, code])
+  @@index([tournamentId])
+  @@index([poolId])
+}
+
+model Pool {
+  id           String     @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  name         String
+
+  players Player[]
+  matches Match[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([tournamentId, name])
+  @@index([tournamentId])
+}
+
+model Match {
+  id           String     @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  stage       MatchStage
+  bracketSide BracketSide?
+  round       Int
+  position    Int
+
+  poolId String?
+  pool   Pool?   @relation(fields: [poolId], references: [id], onDelete: Cascade)
+
+  player1Id String?
+  player1   Player? @relation("Player1Matches", fields: [player1Id], references: [id])
+  player2Id String?
+  player2   Player? @relation("Player2Matches", fields: [player2Id], references: [id])
+
+  games         Json?
+  player1Score  Int?
+  player2Score  Int?
+
+  winnerId String?
+  winner   Player? @relation("MatchWinner", fields: [winnerId], references: [id])
+
+  status MatchStatus @default(PENDING)
+
+  // Bracket progression (plain ids, not FK-enforced relations, since matches
+  // are generated as a batch and may point forward/backward to each other)
+  nextMatchId        String?
+  nextMatchSlot      Int?
+  nextLoserMatchId   String?
+  nextLoserMatchSlot Int?
+  isBracketReset     Boolean @default(false)
+
+  court String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tournamentId])
+  @@index([poolId])
+  @@index([nextMatchId])
+  @@index([nextLoserMatchId])
+}
