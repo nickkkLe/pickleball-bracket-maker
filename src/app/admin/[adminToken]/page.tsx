@@ -13,6 +13,7 @@ import { LiveRefresher } from "@/components/LiveRefresher";
 import { RecordAdminVisit } from "@/components/RecordAdminVisit";
 import { DeleteDivisionButton } from "@/components/DeleteDivisionButton";
 import { NotAvailable } from "@/components/NotAvailable";
+import { QrCode } from "@/components/QrCode";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertTitle, AlertDescription, AlertAction } from "@/components/ui/alert";
@@ -96,17 +97,22 @@ export default async function AdminPage({ params }: { params: Promise<{ adminTok
           </div>
           <p className="mt-1 text-sm text-muted-foreground">{FORMAT_LABEL[tournament.format]}</p>
         </div>
-        <div className="w-full max-w-sm sm:w-auto">
-          <CopyField label="Share this with players" value={publicUrl || `/t/${tournament.slug}`} />
-          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
-            <Link href={`/t/${tournament.slug}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-              View public page
-              <ArrowUpRight className="size-3" />
-            </Link>
-            <Link href={`/admin/e/${event.adminToken}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-              {event.divisionCount > 1 ? "Manage all brackets" : "Add another bracket"}
-              <ArrowUpRight className="size-3" />
-            </Link>
+        <div className="flex w-full max-w-sm gap-3 sm:w-auto">
+          <div className="shrink-0 self-start rounded-lg border border-border bg-white p-1.5">
+            <QrCode value={publicUrl || `/t/${tournament.slug}`} size={88} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <CopyField label="Share this with players" value={publicUrl || `/t/${tournament.slug}`} />
+            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+              <Link href={`/t/${tournament.slug}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                View public page
+                <ArrowUpRight className="size-3" />
+              </Link>
+              <Link href={`/admin/e/${event.adminToken}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                {event.divisionCount > 1 ? "Manage all brackets" : "Add another bracket"}
+                <ArrowUpRight className="size-3" />
+              </Link>
+            </div>
           </div>
         </div>
       </div>
